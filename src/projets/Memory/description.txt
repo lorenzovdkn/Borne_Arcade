@@ -1,0 +1,14 @@
+Memory - Jeu 2 Joueurs Tour par Tour
+
+Retournez deux cartes pour trouver les paires.
+Si la paire est correcte, vous marquez un point
+et rejouez immédiatement.
+
+Sinon, les cartes se referment et c'est au tour
+de l'adversaire de jouer.
+
+Joueur 1 : joystick gauche (flèches) + touche &
+Joueur 2 : joystick droit (oklm) + touche Q
+
+Le joueur actif est indiqué par ▶ et son curseur
+de couleur est visible sur la grille!
