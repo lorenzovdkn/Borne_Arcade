@@ -10,9 +10,10 @@ from ollama_wrapper import OllamaWrapper
 
 
 def print_stats(stats):
-    print(f"Fichiers scannés: {stats['total_scanned']}")
+    print(f"\nFichiers scannés: {stats['total_scanned']}")
     print(f"Fonctions sans doc: {stats['functions_found']}")
     print(f"Documentées: {stats['functions_documented']}")
+    print(f"Rejetées: {stats.get('functions_rejected', 0)}")
     print(f"Échecs: {stats['functions_failed']}")
 
     if stats["files_modified"]:
@@ -37,18 +38,23 @@ def run_check(client: OllamaWrapper, project_root: Path):
         print(f"- {func['class_name']}.{func['function_name']} ({func['file']}:{func['line']})")
 
 
-def run_documentation(client: OllamaWrapper, project_root: Path, apply_changes: bool):
+def run_documentation(client: OllamaWrapper, project_root: Path, apply_changes: bool, interactive: bool):
     if not client.is_server_running():
         print("Serveur Ollama non accessible.")
         print("Lancez: ollama serve")
         sys.exit(1)
 
-    mode = "apply" if apply_changes else "dry-run"
-    print(f"Mode: {mode} (Ollama {client.get_version()})")
+    if interactive and not apply_changes:
+        print("⚠️  Mode interactif activé : les modifications seront appliquées après validation.")
+        apply_changes = True  # En mode interactif, on applique forcément
+
+    mode = "interactif" if interactive else ("apply" if apply_changes else "dry-run")
+    print(f"Mode: {mode} (Ollama {client.get_version()})\n")
 
     stats = client.auto_document_java_files(
         project_root=project_root,
         dry_run=not apply_changes,
+        interactive=interactive,
     )
     print_stats(stats)
 
@@ -57,6 +63,7 @@ def main():
     parser = argparse.ArgumentParser(description="Génération automatique de Javadoc")
     parser.add_argument("--check", action="store_true", help="Lister les fonctions non documentées")
     parser.add_argument("--apply", action="store_true", help="Appliquer les modifications")
+    parser.add_argument("--interactive", "-i", "--i", action="store_true", help="Mode interactif avec validation manuelle")
     args = parser.parse_args()
 
     client = OllamaWrapper()
@@ -65,7 +72,7 @@ def main():
     if args.check:
         run_check(client, project_root)
     else:
-        run_documentation(client, project_root, apply_changes=args.apply)
+        run_documentation(client, project_root, apply_changes=args.apply, interactive=args.interactive)
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@ class OllamaGenerateResult:
 
 
 class OllamaWrapper:
-    def __init__(self, base_url: str = "http://10.22.28.190:11434", timeout_s: float = 60.0) -> None:
+    def __init__(self, base_url: str = "http://10.22.28.190:11434", timeout_s: float = 300.0) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout_s = timeout_s
 
@@ -189,15 +189,32 @@ class OllamaWrapper:
         class_match = re.search(r"class\s+(\w+)", content)
         class_name = class_match.group(1) if class_match else "Unknown"
 
+        # Pattern plus strict: doit commencer avec un modificateur réel (pas juste un espace)
+        # et exclure les mots-clés de contrôle (if, for, while, switch, catch)
         func_pattern = re.compile(
-            r"(?:public|private|protected|static|final|native|synchronized|abstract|\s)+"
-            r"[\w<>\[\], ?]+\s+(\w+)\s*\([^)]*\)\s*(?:throws\s+[^{]+)?\{"
+            r"^\s*(?:public|private|protected|static|final|native|synchronized|abstract)\s+"
+            r"(?:(?:public|private|protected|static|final|native|synchronized|abstract)\s+)*"
+            r"[\w<>\[\], ?]+\s+(\w+)\s*\([^)]*\)\s*(?:throws\s+[^{]+)?\s*\{"
         )
+        
+        # Mots-clés de contrôle à exclure
+        control_keywords = {"if", "for", "while", "switch", "catch", "synchronized"}
 
         for index, line in enumerate(lines):
+            # Ignorer les lignes commentées
+            stripped = line.strip()
+            if stripped.startswith("//") or stripped.startswith("/*") or stripped.startswith("*"):
+                continue
+                
             match = func_pattern.search(line)
             if not match:
                 continue
+                
+            func_name = match.group(1)
+            # Exclure les mots-clés de contrôle
+            if func_name in control_keywords:
+                continue
+                
             if self._has_javadoc(lines, index):
                 continue
 
@@ -206,34 +223,52 @@ class OllamaWrapper:
                     "file": str(java_file.relative_to(project_root)),
                     "line": index + 1,
                     "class_name": class_name,
-                    "function_name": match.group(1),
+                    "function_name": func_name,
                     "signature": self._extract_function_signature(lines, index),
                     "code": self._extract_function_body(lines, index),
                 }
             )
 
     def _has_javadoc(self, lines: Sequence[str], func_line: int) -> bool:
+        """
+        Détecte si une fonction a une Javadoc au-dessus d'elle.
+        Remonte depuis la ligne de la fonction en sautant les annotations et lignes vides.
+        """
         i = func_line - 1
+        
+        # Sauter les lignes vides
         while i >= 0 and lines[i].strip() == "":
             i -= 1
 
         if i < 0:
             return False
 
-        if lines[i].strip().startswith("@"):
-            while i >= 0 and lines[i].strip().startswith("@"):
+        # Sauter les annotations (@Override, @Deprecated, etc.)
+        while i >= 0 and lines[i].strip().startswith("@"):
+            i -= 1
+            # Sauter les lignes vides entre les annotations
+            while i >= 0 and lines[i].strip() == "":
                 i -= 1
 
-        if i < 0 or not lines[i].strip().endswith("*/"):
+        if i < 0:
             return False
 
+        # Vérifier si on a bien une fin de commentaire
+        stripped = lines[i].strip()
+        if not stripped.endswith("*/"):
+            return False
+
+        # Remonter pour trouver le début du commentaire
         while i >= 0:
             stripped = lines[i].strip()
             if stripped.startswith("/**"):
+                # C'est bien une Javadoc
                 return True
-            if stripped.startswith("/*"):
+            if stripped.startswith("/*") and not stripped.startswith("/**"):
+                # C'est un commentaire simple, pas une Javadoc
                 return False
             i -= 1
+        
         return False
 
     def _extract_function_signature(self, lines: Sequence[str], start: int) -> str:
@@ -296,20 +331,64 @@ class OllamaWrapper:
         return javadoc
 
     def _select_generation_model(self) -> Optional[str]:
+        required_model = "qwen3:8b"
         try:
             model_names = [m.name for m in self.list_models()]
         except OllamaError:
             return None
 
-        preferred = ["qwen3:8b", "qwen2:latest", "gemma2:latest", "mistral:latest"]
-        for name in preferred:
-            if name in model_names:
-                return name
-
-        for name in model_names:
-            if "embedding" not in name.lower():
-                return name
+        if required_model in model_names:
+            return required_model
         return None
+
+    def _display_preview(
+        self, 
+        func_info: Dict[str, Any], 
+        javadoc: str, 
+        lines: List[str],
+        index: int
+    ) -> None:
+        """Affiche un aperçu de la modification proposée."""
+        print("\n" + "="*80)
+        print(f"📄 {func_info['file']}:{func_info['line']}")
+        print(f"📌 {func_info['class_name']}.{func_info['function_name']}")
+        print("="*80)
+        
+        # Afficher le contexte avant
+        start = max(0, func_info['line'] - 5)
+        end = func_info['line']
+        print(f"\n📖 Contexte (lignes {start+1}-{end}):")
+        for i in range(start, end):
+            print(f"  {i+1:4d} | {lines[i]}")
+        
+        # Afficher la Javadoc générée
+        print(f"\n✨ Javadoc générée:")
+        for line in javadoc.splitlines():
+            print(f"  \033[32m+    | {line}\033[0m")
+        
+        # Afficher la fonction
+        print(f"\n  {func_info['line']:4d} | {lines[func_info['line']-1]}")
+        print()
+
+    def _ask_user_validation(self, current: int, total: int) -> str:
+        """
+        Demande la validation à l'utilisateur.
+        Retourne 'v' (valider), 'r' (rejeter), 'g' (régénérer), ou 'q' (quitter)
+        """
+        while True:
+            print(f"[{current}/{total}] Choix:")
+            print("  [v] Valider et appliquer")
+            print("  [r] Rejeter (ne pas appliquer)")
+            print("  [g] Régénérer avec l'IA")
+            print("  [q] Quitter la génération")
+            
+            choice = input("\nVotre choix [v/r/g/q]: ").strip().lower()
+            
+            if choice in ['v', 'r', 'g', 'q']:
+                return choice
+            
+            print("❌ Choix invalide. Veuillez entrer 'v', 'r', 'g' ou 'q'.")
+            print()
 
     def auto_document_java_files(
         self,
@@ -317,6 +396,7 @@ class OllamaWrapper:
         project_root: Union[str, Path] = ".",
         model: Optional[str] = None,
         dry_run: bool = False,
+        interactive: bool = False,
     ) -> Dict[str, Any]:
         root = Path(project_root)
         stats: Dict[str, Any] = {
@@ -324,13 +404,18 @@ class OllamaWrapper:
             "functions_found": 0,
             "functions_documented": 0,
             "functions_failed": 0,
+            "functions_rejected": 0,
             "files_modified": [],
             "errors": [],
         }
 
         model_name = model or self._select_generation_model()
         if not model_name:
-            stats["errors"].append("Aucun modèle de génération disponible")
+            stats["errors"].append("Le modèle requis qwen3:8b est indisponible (installez-le avec: ollama pull qwen3:8b)")
+            return stats
+
+        if model_name != "qwen3:8b":
+            stats["errors"].append("Le générateur impose le modèle qwen3:8b")
             return stats
 
         undocumented = self.detect_undocumented_functions(project_root=root)
@@ -342,6 +427,13 @@ class OllamaWrapper:
         for func in undocumented:
             by_file.setdefault(func["file"], []).append(func)
 
+        # Mode interactif : traiter toutes les fonctions une par une
+        if interactive:
+            return self._interactive_documentation(
+                root, undocumented, model_name, dry_run, stats
+            )
+        
+        # Mode batch (ancien comportement)
         for relative_file, functions in by_file.items():
             file_path = root / relative_file
             stats["total_scanned"] += 1
@@ -383,5 +475,128 @@ class OllamaWrapper:
             if modified:
                 file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
                 stats["files_modified"].append(relative_file)
+
+        return stats
+
+    def _interactive_documentation(
+        self,
+        root: Path,
+        undocumented: List[Dict[str, Any]],
+        model_name: str,
+        dry_run: bool,
+        stats: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Traite les fonctions en mode interactif avec validation utilisateur.
+        """
+        total = len(undocumented)
+        modifications: Dict[str, List[tuple]] = {}  # file -> [(line_index, javadoc, indent)]
+        
+        for i, func in enumerate(undocumented, 1):
+            file_path = root / func["file"]
+            
+            if not file_path.exists():
+                stats["errors"].append(f"Fichier non trouvé: {func['file']}")
+                continue
+            
+            try:
+                lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except Exception as e:
+                stats["errors"].append(f"Lecture impossible {func['file']}: {e}")
+                continue
+            
+            # Boucle pour permettre la régénération
+            while True:
+                try:
+                    # Générer la Javadoc
+                    javadoc = self.generate_javadoc_for_function(
+                        model=model_name,
+                        function_code=func["code"],
+                        class_name=func["class_name"],
+                        function_name=func["function_name"],
+                    )
+                    
+                    # Afficher l'aperçu
+                    self._display_preview(func, javadoc, lines, func["line"] - 1)
+                    
+                    # Demander validation
+                    choice = self._ask_user_validation(i, total)
+                    
+                    if choice == 'v':
+                        # Valider : enregistrer la modification
+                        line_index = func["line"] - 1
+                        indent = len(lines[line_index]) - len(lines[line_index].lstrip())
+                        
+                        modifications.setdefault(func["file"], []).append(
+                            (func["line"], javadoc, indent)
+                        )
+                        
+                        stats["functions_documented"] += 1
+                        print("✅ Validé\n")
+                        break  # Passer à la fonction suivante
+                    
+                    elif choice == 'r':
+                        # Rejeter : ignorer cette fonction
+                        stats["functions_rejected"] += 1
+                        print("❌ Rejeté\n")
+                        break  # Passer à la fonction suivante
+                    
+                    elif choice == 'g':
+                        # Régénérer : reboucler
+                        print("🔄 Régénération...\n")
+                        continue  # Reboucler pour régénérer
+                    
+                    elif choice == 'q':
+                        # Quitter
+                        print("🛑 Arrêt de la génération.\n")
+                        stats["errors"].append("Arrêt manuel par l'utilisateur")
+                        # Appliquer les modifications déjà validées
+                        self._apply_modifications(root, modifications, dry_run, stats)
+                        return stats
+                
+                except Exception as e:
+                    stats["functions_failed"] += 1
+                    stats["errors"].append(f"{func['file']}:{func['line']} {e}")
+                    print(f"❌ Erreur: {e}\n")
+                    break  # Passer à la fonction suivante en cas d'erreur
+        
+        # Appliquer toutes les modifications validées
+        self._apply_modifications(root, modifications, dry_run, stats)
+        return stats
+
+    def _apply_modifications(
+        self,
+        root: Path,
+        modifications: Dict[str, List[tuple]],
+        dry_run: bool,
+        stats: Dict[str, Any]
+    ) -> None:
+        """
+        Applique toutes les modifications validées aux fichiers.
+        """
+        if dry_run:
+            print("\n[DRY-RUN] Aucune modification appliquée.")
+            return
+        
+        for relative_file, mods in modifications.items():
+            file_path = root / relative_file
+            stats["total_scanned"] += 1
+            
+            try:
+                lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except Exception as e:
+                stats["errors"].append(f"Lecture impossible {relative_file}: {e}")
+                continue
+            
+            # Trier par ligne décroissante pour insérer du bas vers le haut
+            for line_num, javadoc, indent in sorted(mods, key=lambda x: x[0], reverse=True):
+                line_index = line_num - 1
+                prefix = " " * indent
+                block = [prefix + ln if ln.strip() else "" for ln in javadoc.splitlines()]
+                lines[line_index:line_index] = block + [""]
+            
+            file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            stats["files_modified"].append(relative_file)
+            print(f"💾 Fichier modifié: {relative_file}")
 
         return stats

@@ -69,10 +69,21 @@ for game in src/projets/*/; do
 done
 
 # Permissions
-chmod +x launch-arcade.sh launch-dev.sh installation.sh 2>/dev/null || true
+chmod +x launch.sh launch-arcade.sh launch-dev.sh installation.sh 2>/dev/null || true
 find src/projets -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
 
 echo ""
-echo "Installation terminée"
-echo "Lancer la borne: ./launch-arcade.sh"
-echo "Mode développement: ./launch-dev.sh"
+echo "=== INSTALLATION TERMINÉE ==="
+echo ""
+echo "Lancement de la borne d'arcade:"
+echo "   Mode production (par défaut):  ./launch.sh"
+echo "   Mode production direct:        ./launch-arcade.sh"
+echo "   Mode développement:            ./launch-dev.sh"
+echo ""
+echo "Configuration:"
+echo "   Éditer config.properties pour personnaliser:"
+echo "   - mode: PRODUCTION ou DEVELOPPEMENT"
+echo "   - dev.doc.interactive: true ou false"
+echo "   - dev.doc.enabled: true ou false"
+echo ""
+echo "Note: Ollama est disponible en serveur local à l'IUT (10.22.28.190:11434)"

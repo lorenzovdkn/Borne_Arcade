@@ -1,4 +1,7 @@
 import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Gestionnaire des outils de développement et IA.
@@ -65,18 +68,55 @@ public class DevTools {
         System.out.println("[DevTools] =====================================\n");
     }
 
+    /**
+     * Génère la documentation en simulant le processus de création.
+     * Vérifie si les outils de développement sont activés avant de commencer.
+     * Affiche des messages d'état et simule un délai de génération.
+     * En cas d'interruption, affiche une erreur correspondante.
+     * Le chemin d'export est indiqué à la fin de la génération.
+     */
+
     public void generateDocumentation() {
         if (!isEnabled()) return;
+        if (!Boolean.parseBoolean(config.getProperty("dev.doc.enabled", "true"))) {
+            System.out.println("[DevTools] Génération de documentation désactivée (dev.doc.enabled=false)");
+            return;
+        }
+
+        boolean interactive = Boolean.parseBoolean(config.getProperty("dev.doc.interactive", "false"));
+        boolean applyChanges = Boolean.parseBoolean(config.getProperty("dev.doc.apply", "false"));
+
+        List<String> command = new ArrayList<>();
+        command.add("python3");
+        command.add("src/IA/API/doc_generator.py");
+
+        if (interactive) {
+            command.add("--interactive");
+        } else if (applyChanges) {
+            command.add("--apply");
+        }
         
-        // Simuler la génération de documentation
         System.out.println("[DevTools] Génération de la documentation en cours...");
-        // Ici, vous pourriez intégrer un outil de génération de documentation réel
-        // ou analyser le code pour extraire des commentaires et générer des fichiers.
+        System.out.println("[DevTools] Commande: " + String.join(" ", command));
+
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
+        processBuilder.directory(new File("."));
+        processBuilder.inheritIO();
+
         try {
-            Thread.sleep(2000); // Simuler le temps de génération
+            Process process = processBuilder.start();
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0) {
+                System.out.println("[DevTools] Documentation générée avec succès.");
+            } else {
+                System.err.println("[DevTools] Échec de la génération de documentation (code=" + exitCode + ").");
+            }
+        } catch (IOException e) {
+            System.err.println("[DevTools] Impossible de lancer doc_generator.py: " + e.getMessage());
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             System.err.println("[DevTools] Erreur lors de la génération de documentation: " + e.getMessage());
         }
-        System.out.println("[DevTools] Documentation générée avec succès dans: " + outputDir);
     }
 }
