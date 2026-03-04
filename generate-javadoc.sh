@@ -229,19 +229,14 @@ run_javadoc() {
     # Collecter tous les fichiers Java
     local java_files=()
     
-    # Fichiers sources principaux
+    # Fichiers sources principaux uniquement (exclure les libs)
     if [[ -d "$JAVA_SRC_DIRS" ]]; then
         while IFS= read -r -d '' file; do
             java_files+=("$file")
         done < <(find "$JAVA_SRC_DIRS" -name "*.java" -print0 2>/dev/null)
     fi
     
-    # Fichiers de la bibliothèque MG2D (si présents)
-    if [[ -d "$LIB_DIR/MG2D" ]]; then
-        while IFS= read -r -d '' file; do
-            java_files+=("$file")
-        done < <(find "$LIB_DIR/MG2D" -name "*.java" -print0 2>/dev/null)
-    fi
+    # Note: Les bibliothèques (MG2D, etc.) sont exclues de la génération
     
     if [[ ${#java_files[@]} -eq 0 ]]; then
         log_warning "Aucun fichier Java trouvé"
@@ -262,7 +257,7 @@ run_javadoc() {
         -author
         -version
         -private
-        -sourcepath "$JAVA_SRC_DIRS:$LIB_DIR"
+        -sourcepath "$JAVA_SRC_DIRS"
         -classpath ".:$LIB_DIR"
     )
     

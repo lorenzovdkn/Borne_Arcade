@@ -165,9 +165,9 @@ class OllamaWrapper:
 
     def detect_undocumented_functions(self, project_root: Union[str, Path] = ".") -> List[Dict[str, Any]]:
         root = Path(project_root)
+        # Scanner uniquement les fichiers du projet, pas les libs (MG2D, etc.)
         scan_dirs = [
             root / "src" / "main" / "java",
-            root / "src" / "IA" / "API",
             root / "src" / "tests" / "java",
         ]
 

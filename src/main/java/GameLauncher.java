@@ -6,6 +6,14 @@ public class GameLauncher {
         SHELL, PYTHON, JAVA, LOVE, UNKNOWN
     }
     
+    /**
+     * Détermine le type de jeu en fonction des fichiers présents dans le répertoire spécifié.
+     * La priorité est donnée aux types suivants dans l'ordre : shell, LOVE2D, Python, Java.
+     * 
+     * @param gameDir Le répertoire contenant les fichiers du jeu.
+     * @return Le type de jeu détecté (SHELL, LOVE, PYTHON, JAVA ou UNKNOWN).
+     */
+
     public static GameType detectGameType(File gameDir) {
         
         File[] shellScripts = gameDir.listFiles((dir, name) -> name.endsWith(".sh"));
