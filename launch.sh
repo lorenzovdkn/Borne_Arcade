@@ -66,7 +66,7 @@ find lib -name "*.class" -delete 2>/dev/null || true
 find src/main/java -name "*.class" -delete 2>/dev/null || true
 
 echo -e "${YELLOW}Compilation des bibliothèques...${NC}"
-javac -encoding UTF-8 lib/MG2D/*.java lib/MG2D/**/*.java 2>/dev/null || true
+find lib/MG2D -name "*.java" -print0 | xargs -0 javac -encoding UTF-8 -cp lib 2>/dev/null || true
 
 echo -e "${YELLOW}Compilation du code source...${NC}"
 javac -encoding UTF-8 -cp ".:lib:src/resources" src/main/java/*.java
