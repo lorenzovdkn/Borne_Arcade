@@ -19,8 +19,8 @@ echo "Installation des dépendances de base..."
 sudo apt-get install -y wget curl git ca-certificates
 
 # Installation Java
-echo "Installation de Java JDK 17..."
-sudo apt-get install -y openjdk-17-jdk
+echo "Installation de Java JDK 21..."
+sudo apt-get install -y openjdk-21-jdk
 
 # Installation Python
 echo "Installation de Python 3 et pip..."
@@ -50,6 +50,10 @@ if [ -f "src/projets/TronGame/requirements.txt" ]; then
     echo "Installation dépendances TronGame..."
     pip3 install --break-system-packages -r src/projets/TronGame/requirements.txt
 fi
+
+# Installation librosa pour PianoTile
+echo "Installation de librosa pour PianoTile..."
+pip3 install --break-system-packages librosa
 
 # Installation Love2D
 echo "Installation de Love2D..."
