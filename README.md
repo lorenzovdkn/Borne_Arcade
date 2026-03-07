@@ -49,3 +49,4 @@ Voir le dossier `Documents/Documentation/` pour :
 - Guide utilisateur
 - Guide d'ajout de jeu
 - Documentation technique
+- Rapport
