@@ -226,6 +226,11 @@ class HighScore{
 	System.exit(0);
     }
 
+    /**
+     * Lit le fichier de classement des meilleurs scores et retourne la liste des scores.
+     * @param fichier le chemin du fichier de classement à lire
+     * @return une liste de LigneHighScore contenant tous les scores du fichier
+     */
     public static ArrayList<LigneHighScore> lireFichier(String fichier){
 	ArrayList<LigneHighScore> l = new ArrayList<LigneHighScore>();
 

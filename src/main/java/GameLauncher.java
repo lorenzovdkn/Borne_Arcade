@@ -44,16 +44,33 @@ public class GameLauncher {
         return GameType.UNKNOWN;
     }
     
+    /**
+     * Vérifie si un répertoire contient au moins un fichier avec l'extension spécifiée.
+     * @param dir le répertoire dans lequel rechercher
+     * @param extension l'extension de fichier à rechercher (ex: ".java", ".sh")
+     * @return true si au moins un fichier avec cette extension existe, false sinon
+     */
     private static boolean hasFileWithExtension(File dir, String extension) {
         File[] files = dir.listFiles((d, name) -> name.endsWith(extension));
         return files != null && files.length > 0;
     }
     
+    /**
+     * Recherche un script shell dans le répertoire du jeu.
+     * @param gameDir le répertoire du jeu où chercher le script
+     * @return le premier fichier .sh trouvé, ou null si aucun script n'existe
+     */
     private static File findShellScript(File gameDir) {
         File[] shellScripts = gameDir.listFiles((dir, name) -> name.endsWith(".sh"));
         return (shellScripts != null && shellScripts.length > 0) ? shellScripts[0] : null;
     }
     
+    /**
+     * Recherche le nom de la classe principale Java dans le répertoire du jeu.
+     * Cherche d'abord Main.java ou Main.class, sinon prend le premier fichier Java trouvé.
+     * @param gameDir le répertoire du jeu où chercher la classe principale
+     * @return le nom de la classe principale (sans extension)
+     */
     private static String findMainJavaClass(File gameDir) {
         // Chercher Main.java en priorité
         if (new File(gameDir, "Main.java").exists() || 
@@ -74,6 +91,13 @@ public class GameLauncher {
         return "Main";
     }
     
+    /**
+     * Lance un jeu à partir de son nom ou chemin.
+     * Détecte automatiquement le type de jeu (Shell, Python, Java, Lua) et exécute la commande appropriée.
+     * @param gameName le nom du jeu ou le chemin vers le répertoire du jeu
+     * @return le processus du jeu lancé
+     * @throws Exception si le jeu est introuvable ou de type inconnu
+     */
     public static Process launchGame(String gameName) throws Exception {
         
         File gameDir;

@@ -134,10 +134,18 @@ public class BoiteSelection extends Boite{
 	return true;
     }
 
+    /**
+     * Retourne le pointeur associé à cette boîte de sélection.
+     * @return le pointeur utilisé pour la navigation dans la boîte
+     */
     public Pointeur getPointeur() {
 	return pointeur;
     }
 
+    /**
+     * Définit le pointeur associé à cette boîte de sélection.
+     * @param pointeur le nouveau pointeur à utiliser pour la navigation
+     */
     public void setPointeur(Pointeur pointeur) {
 	this.pointeur = pointeur;
     }
