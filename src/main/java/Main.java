@@ -33,7 +33,7 @@ public class Main {
         Graphique g = new Graphique();
         while(true){
             try{
-                // Thread.sleep(250);
+                Thread.sleep(250);
             }catch(Exception e){ 
                 System.out.println("Erreur dans la boucle principale : " + e.getMessage()); 
             }

@@ -33,7 +33,19 @@ class OllamaGenerateResult:
 
 
 class OllamaWrapper:
+    """
+    Wrapper Python pour l'API Ollama.
+    Permet de communiquer avec un serveur Ollama pour générer du texte,
+    analyser des images et auto-documenter du code Java.
+    """
+
     def __init__(self, base_url: str = "http://10.22.28.190:11434", timeout_s: float = 300.0) -> None:
+        """
+        Initialise le wrapper Ollama.
+
+        :param base_url: URL de base du serveur Ollama (par défaut: serveur IUT)
+        :param timeout_s: Timeout en secondes pour les requêtes HTTP
+        """
         self._base_url = base_url.rstrip("/")
         self._timeout_s = timeout_s
 
@@ -44,6 +56,16 @@ class OllamaWrapper:
         *,
         body: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Effectue une requête HTTP vers l'API Ollama et retourne la réponse JSON.
+
+        :param method: Méthode HTTP (GET, POST, etc.)
+        :param path: Chemin de l'endpoint API
+        :param body: Corps de la requête (optionnel)
+        :return: Dictionnaire contenant la réponse JSON
+        :raises OllamaConnectionError: Si la connexion échoue
+        :raises OllamaResponseError: Si la réponse n'est pas du JSON valide
+        """
         import urllib.error
         import urllib.request
         from urllib.parse import urljoin
@@ -76,6 +98,11 @@ class OllamaWrapper:
         return payload
 
     def is_server_running(self) -> bool:
+        """
+        Vérifie si le serveur Ollama est accessible.
+
+        :return: True si le serveur répond, False sinon
+        """
         try:
             self.get_version()
             return True
@@ -83,6 +110,12 @@ class OllamaWrapper:
             return False
 
     def get_version(self) -> str:
+        """
+        Récupère la version du serveur Ollama.
+
+        :return: Chaîne de version du serveur
+        :raises OllamaResponseError: Si la réponse est invalide
+        """
         payload = self._http_request_json("GET", "/api/version")
         version = payload.get("version")
         if not isinstance(version, str):
@@ -90,6 +123,11 @@ class OllamaWrapper:
         return version
 
     def list_models(self) -> List[OllamaModelInfo]:
+        """
+        Liste tous les modèles disponibles sur le serveur Ollama.
+
+        :return: Liste des modèles disponibles
+        """
         payload = self._http_request_json("GET", "/api/tags")
         raw_models = payload.get("models")
         if not isinstance(raw_models, list):
@@ -109,6 +147,16 @@ class OllamaWrapper:
         system: Optional[str] = None,
         options: Optional[Mapping[str, Any]] = None,
     ) -> OllamaGenerateResult:
+        """
+        Génère du texte à partir d'un prompt en utilisant un modèle Ollama.
+
+        :param model: Nom du modèle à utiliser (ex: 'qwen3:8b')
+        :param prompt: Texte d'entrée pour la génération
+        :param system: Prompt système optionnel pour configurer le comportement
+        :param options: Options supplémentaires pour la génération
+        :return: Résultat de la génération contenant la réponse
+        :raises OllamaResponseError: Si la réponse est invalide
+        """
         body: Dict[str, Any] = {
             "model": model,
             "prompt": prompt,
@@ -139,6 +187,18 @@ class OllamaWrapper:
         system: Optional[str] = None,
         options: Optional[Mapping[str, Any]] = None,
     ) -> OllamaGenerateResult:
+        """
+        Génère du texte à partir d'un prompt et d'une image (vision multimodale).
+
+        :param model: Nom du modèle à utiliser (doit supporter la vision)
+        :param prompt: Texte d'entrée pour la génération
+        :param image: Image sous forme de chemin, Path ou bytes
+        :param system: Prompt système optionnel
+        :param options: Options supplémentaires pour la génération
+        :return: Résultat de la génération contenant la réponse
+        :raises TypeError: Si le format de l'image est invalide
+        :raises OllamaResponseError: Si la réponse est invalide
+        """
         if isinstance(image, (str, Path)):
             image_bytes = Path(image).read_bytes()
         elif isinstance(image, (bytes, bytearray)):
@@ -164,6 +224,12 @@ class OllamaWrapper:
         return OllamaGenerateResult(response=response)
 
     def detect_undocumented_functions(self, project_root: Union[str, Path] = ".") -> List[Dict[str, Any]]:
+        """
+        Détecte toutes les fonctions Java sans documentation Javadoc dans le projet.
+
+        :param project_root: Racine du projet à scanner
+        :return: Liste des fonctions non documentées avec leurs métadonnées
+        """
         root = Path(project_root)
         # Scanner uniquement les fichiers du projet, pas les libs (MG2D, etc.)
         scan_dirs = [
@@ -180,6 +246,13 @@ class OllamaWrapper:
         return undocumented
 
     def _analyze_java_file(self, java_file: Path, project_root: Path, out: List[Dict[str, Any]]) -> None:
+        """
+        Analyse un fichier Java pour trouver les fonctions sans Javadoc.
+
+        :param java_file: Chemin du fichier Java à analyser
+        :param project_root: Racine du projet (pour les chemins relatifs)
+        :param out: Liste de sortie où ajouter les fonctions trouvées
+        """
         try:
             lines = java_file.read_text(encoding="utf-8", errors="replace").splitlines()
         except Exception:
@@ -233,6 +306,10 @@ class OllamaWrapper:
         """
         Détecte si une fonction a une Javadoc au-dessus d'elle.
         Remonte depuis la ligne de la fonction en sautant les annotations et lignes vides.
+
+        :param lines: Liste des lignes du fichier source Java
+        :param func_line: Numéro de ligne où se trouve la déclaration de la fonction
+        :return: True si une Javadoc est présente, False sinon
         """
         i = func_line - 1
         
@@ -272,6 +349,13 @@ class OllamaWrapper:
         return False
 
     def _extract_function_signature(self, lines: Sequence[str], start: int) -> str:
+        """
+        Extrait la signature complète d'une fonction Java.
+
+        :param lines: Lignes du fichier source
+        :param start: Index de la ligne de début de la fonction
+        :return: Signature de la fonction sur une seule ligne
+        """
         parts: List[str] = []
         i = start
         while i < len(lines) and i < start + 10:
@@ -282,6 +366,14 @@ class OllamaWrapper:
         return " ".join(parts).strip()
 
     def _extract_function_body(self, lines: Sequence[str], start: int, max_lines: int = 80) -> str:
+        """
+        Extrait le corps complet d'une fonction Java.
+
+        :param lines: Lignes du fichier source
+        :param start: Index de la ligne de début de la fonction
+        :param max_lines: Nombre maximum de lignes à extraire
+        :return: Corps de la fonction incluant la signature
+        """
         body: List[str] = []
         brace_count = 0
         opened = False
@@ -306,6 +398,15 @@ class OllamaWrapper:
         class_name: str,
         function_name: str,
     ) -> str:
+        """
+        Génère un commentaire Javadoc pour une fonction Java via l'IA.
+
+        :param model: Nom du modèle Ollama à utiliser
+        :param function_code: Code source de la fonction
+        :param class_name: Nom de la classe contenant la fonction
+        :param function_name: Nom de la fonction
+        :return: Bloc Javadoc formaté (/** ... */)
+        """
         prompt = (
             "Génère un commentaire Javadoc en français pour cette fonction Java.\n"
             "Retourne uniquement le bloc Javadoc (/** ... */).\n\n"
@@ -331,6 +432,11 @@ class OllamaWrapper:
         return javadoc
 
     def _select_generation_model(self) -> Optional[str]:
+        """
+        Sélectionne le modèle de génération requis (qwen3:8b).
+
+        :return: Nom du modèle si disponible, None sinon
+        """
         required_model = "qwen3:8b"
         try:
             model_names = [m.name for m in self.list_models()]
@@ -348,21 +454,28 @@ class OllamaWrapper:
         lines: List[str],
         index: int
     ) -> None:
-        """Affiche un aperçu de la modification proposée."""
+        """
+        Affiche un aperçu de la modification proposée dans le terminal.
+
+        :param func_info: Dictionnaire contenant les informations de la fonction (file, line, class_name, function_name)
+        :param javadoc: Bloc Javadoc généré à afficher
+        :param lines: Liste des lignes du fichier source
+        :param index: Index de la ligne de la fonction dans le fichier
+        """
         print("\n" + "="*80)
-        print(f"📄 {func_info['file']}:{func_info['line']}")
-        print(f"📌 {func_info['class_name']}.{func_info['function_name']}")
+        print(f" {func_info['file']}:{func_info['line']}")
+        print(f" {func_info['class_name']}.{func_info['function_name']}")
         print("="*80)
         
         # Afficher le contexte avant
         start = max(0, func_info['line'] - 5)
         end = func_info['line']
-        print(f"\n📖 Contexte (lignes {start+1}-{end}):")
+        print(f"\n Contexte (lignes {start+1}-{end}):")
         for i in range(start, end):
             print(f"  {i+1:4d} | {lines[i]}")
         
         # Afficher la Javadoc générée
-        print(f"\n✨ Javadoc générée:")
+        print(f"\n Javadoc générée:")
         for line in javadoc.splitlines():
             print(f"  \033[32m+    | {line}\033[0m")
         
@@ -372,8 +485,11 @@ class OllamaWrapper:
 
     def _ask_user_validation(self, current: int, total: int) -> str:
         """
-        Demande la validation à l'utilisateur.
-        Retourne 'v' (valider), 'r' (rejeter), 'g' (régénérer), ou 'q' (quitter)
+        Demande la validation à l'utilisateur pour une Javadoc générée.
+
+        :param current: Numéro de la fonction en cours de traitement
+        :param total: Nombre total de fonctions à traiter
+        :return: Choix de l'utilisateur ('v' valider, 'r' rejeter, 'g' régénérer, 'q' quitter)
         """
         while True:
             print(f"[{current}/{total}] Choix:")
@@ -387,7 +503,7 @@ class OllamaWrapper:
             if choice in ['v', 'r', 'g', 'q']:
                 return choice
             
-            print("❌ Choix invalide. Veuillez entrer 'v', 'r', 'g' ou 'q'.")
+            print(" Choix invalide. Veuillez entrer 'v', 'r', 'g' ou 'q'.")
             print()
 
     def auto_document_java_files(
@@ -398,6 +514,15 @@ class OllamaWrapper:
         dry_run: bool = False,
         interactive: bool = False,
     ) -> Dict[str, Any]:
+        """
+        Documente automatiquement toutes les fonctions Java sans Javadoc.
+
+        :param project_root: Racine du projet à scanner
+        :param model: Modèle à utiliser (par défaut: qwen3:8b)
+        :param dry_run: Si True, prévisualise sans modifier les fichiers
+        :param interactive: Si True, demande validation pour chaque Javadoc
+        :return: Statistiques de l'opération (fonctions trouvées, documentées, erreurs)
+        """
         root = Path(project_root)
         stats: Dict[str, Any] = {
             "total_scanned": 0,
@@ -488,6 +613,13 @@ class OllamaWrapper:
     ) -> Dict[str, Any]:
         """
         Traite les fonctions en mode interactif avec validation utilisateur.
+
+        :param root: Chemin racine du projet
+        :param undocumented: Liste des fonctions sans documentation à traiter
+        :param model_name: Nom du modèle Ollama à utiliser pour la génération
+        :param dry_run: Si True, ne pas appliquer les modifications
+        :param stats: Dictionnaire de statistiques à mettre à jour
+        :return: Statistiques mises à jour de l'opération
         """
         total = len(undocumented)
         modifications: Dict[str, List[tuple]] = {}  # file -> [(line_index, javadoc, indent)]
@@ -532,23 +664,23 @@ class OllamaWrapper:
                         )
                         
                         stats["functions_documented"] += 1
-                        print("✅ Validé\n")
+                        print(" Validé\n")
                         break  # Passer à la fonction suivante
                     
                     elif choice == 'r':
                         # Rejeter : ignorer cette fonction
                         stats["functions_rejected"] += 1
-                        print("❌ Rejeté\n")
+                        print("Rejeté\n")
                         break  # Passer à la fonction suivante
                     
                     elif choice == 'g':
                         # Régénérer : reboucler
-                        print("🔄 Régénération...\n")
+                        print("Régénération...\n")
                         continue  # Reboucler pour régénérer
                     
                     elif choice == 'q':
                         # Quitter
-                        print("🛑 Arrêt de la génération.\n")
+                        print("Arrêt de la génération.\n")
                         stats["errors"].append("Arrêt manuel par l'utilisateur")
                         # Appliquer les modifications déjà validées
                         self._apply_modifications(root, modifications, dry_run, stats)
@@ -557,8 +689,8 @@ class OllamaWrapper:
                 except Exception as e:
                     stats["functions_failed"] += 1
                     stats["errors"].append(f"{func['file']}:{func['line']} {e}")
-                    print(f"❌ Erreur: {e}\n")
-                    break  # Passer à la fonction suivante en cas d'erreur
+                    print(f"Erreur: {e}\n")
+                    break 
         
         # Appliquer toutes les modifications validées
         self._apply_modifications(root, modifications, dry_run, stats)
@@ -573,6 +705,11 @@ class OllamaWrapper:
     ) -> None:
         """
         Applique toutes les modifications validées aux fichiers.
+
+        :param root: Chemin racine du projet
+        :param modifications: Dictionnaire {fichier: [(ligne, javadoc, indentation), ...]}
+        :param dry_run: Si True, affiche un message sans modifier les fichiers
+        :param stats: Dictionnaire de statistiques à mettre à jour
         """
         if dry_run:
             print("\n[DRY-RUN] Aucune modification appliquée.")
