@@ -45,8 +45,8 @@ def run_documentation(client: OllamaWrapper, project_root: Path, apply_changes: 
         sys.exit(1)
 
     if interactive and not apply_changes:
-        print("⚠️  Mode interactif activé : les modifications seront appliquées après validation.")
-        apply_changes = True  # En mode interactif, on applique forcément
+        print("Mode interactif activé : les modifications seront appliquées après validation.")
+        apply_changes = True 
 
     mode = "interactif" if interactive else ("apply" if apply_changes else "dry-run")
     print(f"Mode: {mode} (Ollama {client.get_version()})\n")

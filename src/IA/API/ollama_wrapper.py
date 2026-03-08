@@ -552,13 +552,11 @@ class OllamaWrapper:
         for func in undocumented:
             by_file.setdefault(func["file"], []).append(func)
 
-        # Mode interactif : traiter toutes les fonctions une par une
         if interactive:
             return self._interactive_documentation(
                 root, undocumented, model_name, dry_run, stats
             )
         
-        # Mode batch (ancien comportement)
         for relative_file, functions in by_file.items():
             file_path = root / relative_file
             stats["total_scanned"] += 1
@@ -637,7 +635,6 @@ class OllamaWrapper:
                 stats["errors"].append(f"Lecture impossible {func['file']}: {e}")
                 continue
             
-            # Boucle pour permettre la régénération
             while True:
                 try:
                     # Générer la Javadoc
@@ -665,24 +662,22 @@ class OllamaWrapper:
                         
                         stats["functions_documented"] += 1
                         print(" Validé\n")
-                        break  # Passer à la fonction suivante
+                        break  
                     
                     elif choice == 'r':
                         # Rejeter : ignorer cette fonction
                         stats["functions_rejected"] += 1
                         print("Rejeté\n")
-                        break  # Passer à la fonction suivante
+                        break
                     
                     elif choice == 'g':
                         # Régénérer : reboucler
                         print("Régénération...\n")
-                        continue  # Reboucler pour régénérer
+                        continue 
                     
                     elif choice == 'q':
-                        # Quitter
                         print("Arrêt de la génération.\n")
                         stats["errors"].append("Arrêt manuel par l'utilisateur")
-                        # Appliquer les modifications déjà validées
                         self._apply_modifications(root, modifications, dry_run, stats)
                         return stats
                 
@@ -692,7 +687,6 @@ class OllamaWrapper:
                     print(f"Erreur: {e}\n")
                     break 
         
-        # Appliquer toutes les modifications validées
         self._apply_modifications(root, modifications, dry_run, stats)
         return stats
 
@@ -734,6 +728,6 @@ class OllamaWrapper:
             
             file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
             stats["files_modified"].append(relative_file)
-            print(f"💾 Fichier modifié: {relative_file}")
+            print(f"Fichier modifié: {relative_file}")
 
         return stats
